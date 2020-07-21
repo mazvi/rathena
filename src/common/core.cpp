@@ -1,29 +1,40 @@
-// Copyright (c) Athena Dev Teams - Licensed under GNU GPL
+// Copyright (c) rAthena Dev Teams - Licensed under GNU GPL
 // For more information, see LICENCE in the main folder
 
-#include "mmo.h"
-#include "cbasetypes.h"
-#include "showmsg.h"
-#include "malloc.h"
-#include "core.h"
-#include "strlib.h"
+#include "core.hpp"
+
+#include "../config/core.hpp"
+
 #ifndef MINICORE
-#include "ers.h"
-#include "socket.h"
-#include "timer.h"
-#include "thread.h"
-#include "mempool.h"
-#include "sql.h"
+#include "ers.hpp"
+#include "socket.hpp"
+#include "timer.hpp"
+#include "sql.hpp"
 #endif
 #include <stdlib.h>
 #include <signal.h>
 #ifndef _WIN32
 #include <unistd.h>
 #else
-#include "winapi.h" // Console close event handling
+#include "winapi.hpp" // Console close event handling
 #include <direct.h> // _chdir
 #endif
 
+#include "cbasetypes.hpp"
+#include "malloc.hpp"
+#include "mmo.hpp"
+#include "showmsg.hpp"
+#include "strlib.hpp"
+
+#ifndef DEPRECATED_COMPILER_SUPPORT
+	#if defined( _MSC_VER ) && _MSC_VER < 1900
+		#error "Visual Studio versions older than Visual Studio 2015 are not officially supported anymore"
+	#elif defined( __clang__ ) && __clang_major__ < 4 && !( __clang_major__ == 3 && __clang_minor__ >= 7 )
+		#error "clang versions older than clang 3.7 are not officially supported anymore"
+	#elif !defined( __clang__ ) && defined( __GNUC__ ) && __GNUC__ < 5
+		#error "GCC versions older than GCC 5 are not officially supported anymore"
+	#endif
+#endif
 
 /// Called when a terminate signal is received.
 void (*shutdown_callback)(void) = NULL;
@@ -34,6 +45,7 @@ void (*shutdown_callback)(void) = NULL;
 
 int runflag = CORE_ST_RUN;
 char db_path[12] = "db"; /// relative path for db from server
+char conf_path[12] = "conf"; /// relative path for conf from server
 
 char *SERVER_NAME = NULL;
 char SERVER_TYPE = ATHENA_SERVER_NONE;
@@ -125,7 +137,7 @@ static void sig_proc(int sn) {
 		//run_flag = 0;	// should we quit?
 		break;
 	case SIGPIPE:
-		//ShowInfo ("Broken pipe found... closing socket\n");	// set to eof in socket.c
+		//ShowInfo ("Broken pipe found... closing socket\n");	// set to eof in socket.cpp
 		break;	// does nothing here
 #endif
 	}
@@ -148,12 +160,10 @@ void signals_init (void) {
 }
 #endif
 
-#ifdef SVNVERSION
-const char *get_svn_revision(void) {
-		return EXPAND_AND_QUOTE(SVNVERSION);
-	}
-#else// not SVNVERSION
 const char* get_svn_revision(void) {
+#ifdef SVNVERSION
+	return EXPAND_AND_QUOTE(SVNVERSION);
+#else// not SVNVERSION
 	static char svn_version_buffer[16] = "";
 	FILE *fp;
 
@@ -244,8 +254,8 @@ const char* get_svn_revision(void) {
 	// fallback
 	svn_version_buffer[0] = UNKNOWN_VERSION;
 	return svn_version_buffer;
-}
 #endif
+}
 
 // Grabs the hash from the last time the user updated their working copy (last pull)
 const char *get_git_hash (void) {
@@ -305,10 +315,16 @@ static void display_title(void) {
 // Warning if executed as superuser (root)
 void usercheck(void)
 {
-#ifndef _WIN32
-    if (geteuid() == 0) {
+#if !defined(BUILDBOT)
+#ifdef _WIN32
+	if (IsCurrentUserLocalAdministrator()) {
+		ShowWarning("You are running rAthena with admin privileges, it is not necessary.\n");
+	}
+#else
+	if (geteuid() == 0) {
 		ShowWarning ("You are running rAthena with root privileges, it is not necessary.\n");
-    }
+	}
+#endif
 #endif
 }
 
@@ -347,8 +363,6 @@ int main (int argc, char **argv)
 	usercheck();
 
 	Sql_Init();
-	rathread_init();
-	mempool_init();
 	db_init();
 	signals_init();
 
@@ -363,7 +377,7 @@ int main (int argc, char **argv)
 
 	// Main runtime cycle
 	while (runflag != CORE_ST_STOP) { 
-		int next = do_timer(gettick_nocache());
+		t_tick next = do_timer(gettick_nocache());
 		do_sockets(next);
 	}
 
@@ -372,8 +386,6 @@ int main (int argc, char **argv)
 	timer_final();
 	socket_final();
 	db_final();
-	mempool_final();
-	rathread_final();
 	ers_final();
 #endif
 

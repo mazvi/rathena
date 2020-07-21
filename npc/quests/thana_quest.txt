@@ -1216,7 +1216,7 @@ tha_t05,62,179,0	script	Brilliant Statue#tt3	111,3,3,{
 				mes "during a millennium war.^000000";
 				next;
 				mes ".........It's not clearly shown......";
-				mes "^b22222...Morroc has gone through this gate";
+				mes "^b22222...Morocc has gone through this gate";
 				mes "from the magical world into the Midgard continent after the millennium war terminated...";
 				next;
 				mes "^b22222The question is that when she come up here, the Satan appears at the same time...";
@@ -1457,7 +1457,7 @@ tha_t06,226,230,0	script	Brilliant Statue#tt4	111,3,3,{
 					mes "This tower used to be";
 					mes "a gate to summon demons ages ago.";
 					mes "And the last visitor was";
-					mes "the infamous Satan Morroc.";
+					mes "the infamous Satan Morocc.";
 					next;
 					mes "^b22222As I followed her trail";
 					mes "I realized that her spells";
@@ -2099,19 +2099,19 @@ OnTouch_:
 	// .@j$: FragmentName
 	switch(.@seal) {
 	case 1:
-		setarray .@i[0],7437,1711,217,167,238;
+		setarray .@i[0],7437,1711,217,167,EF_LANDPROTECTOR;
 		set .@j$,"Misery";
 		break;
 	case 2:
-		setarray .@i[0],7436,1712,202,75,102;
+		setarray .@i[0],7436,1712,202,75,EF_CRASHEARTH;
 		set .@j$,"Agony";
 		break;
 	case 3:
-		setarray .@i[0],7438,1709,80,76,101;
+		setarray .@i[0],7438,1709,80,76,EF_REPAIRWEAPON;
 		set .@j$,"Hatred";
 		break;
 	case 4:
-		setarray .@i[0],7439,1710,62,171,100;
+		setarray .@i[0],7439,1710,62,171,EF_REMOVETRAP;
 		set .@j$,"Despair";
 		break;
 	}
