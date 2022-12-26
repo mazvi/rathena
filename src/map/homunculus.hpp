@@ -4,7 +4,9 @@
 #ifndef HOMUNCULUS_HPP
 #define HOMUNCULUS_HPP
 
+#include <string>
 #include "../common/cbasetypes.hpp"
+#include "../common/database.hpp"
 
 #include "status.hpp" // struct status_data, struct status_change
 #include "unit.hpp" // struct unit_data
@@ -19,6 +21,24 @@
 #else
 	#define APPLY_HOMUN_LEVEL_STATWEIGHT()
 #endif
+
+struct s_homun_exp_db {
+	uint16 level;
+	t_exp exp;
+};
+
+class HomExpDatabase : public TypesafeYamlDatabase<uint16, s_homun_exp_db> {
+public:
+	HomExpDatabase() : TypesafeYamlDatabase("HOMUN_EXP_DB", 1) {
+
+	}
+
+	const std::string getDefaultLocation() override;
+	uint64 parseBodyNode(const ryml::NodeRef& node) override;
+
+	// Additional
+	t_exp get_nextexp(uint16 level);
+};
 
 struct h_stats {
 	unsigned int HP, SP;
@@ -57,15 +77,15 @@ struct homun_data {
 	struct unit_data  ud;
 	struct view_data *vd;
 	struct status_data base_status, battle_status;
-	struct status_change sc;
+	status_change sc;
 	struct regen_data regen;
 	struct s_homunculus_db *homunculusDB;	//[orn]
 	struct s_homunculus homunculus;	//[orn]
 
 	int masterteleport_timer;
-	struct map_session_data *master; //pointer back to its master
+	map_session_data *master; //pointer back to its master
 	int hungry_timer;	//[orn]
-	unsigned int exp_next;
+	t_exp exp_next;
 	std::vector<uint16> blockskill;	// [orn]
 };
 
@@ -153,25 +173,25 @@ void hom_skillup(struct homun_data *hd,uint16 skill_id);
 void hom_calc_skilltree(struct homun_data *hd, bool flag_evolve);
 short hom_checkskill(struct homun_data *hd,uint16 skill_id);
 uint8 hom_skill_get_min_level(int class_, uint16 skill_id);
-void hom_gainexp(struct homun_data *hd,int exp);
+void hom_gainexp(struct homun_data *hd,t_exp exp);
 int hom_levelup(struct homun_data *hd);
 int hom_evolution(struct homun_data *hd);
 int hom_mutate(struct homun_data *hd,int homun_id);
 void hom_heal(struct homun_data *hd);
-int hom_vaporize(struct map_session_data *sd, int flag);
-int hom_ressurect(struct map_session_data *sd, unsigned char per, short x, short y);
+int hom_vaporize(map_session_data *sd, int flag);
+int hom_ressurect(map_session_data *sd, unsigned char per, short x, short y);
 void hom_revive(struct homun_data *hd, unsigned int hp, unsigned int sp);
 void hom_reset_stats(struct homun_data *hd);
 int hom_shuffle(struct homun_data *hd); // [Zephyrus]
 void hom_save(struct homun_data *hd);
-bool hom_call(struct map_session_data *sd);
-bool hom_create_request(struct map_session_data *sd, int class_);
+bool hom_call(map_session_data *sd);
+bool hom_create_request(map_session_data *sd, int class_);
 int hom_search(int key,int type);
-void hom_menu(struct map_session_data *sd,int type);
-int hom_food(struct map_session_data *sd, struct homun_data *hd);
+void hom_menu(map_session_data *sd,int type);
+int hom_food(map_session_data *sd, struct homun_data *hd);
 int hom_hungry_timer_delete(struct homun_data *hd);
-int hom_change_name(struct map_session_data *sd,char *name);
-void hom_change_name_ack(struct map_session_data *sd, char* name, int flag);
+int hom_change_name(map_session_data *sd,char *name);
+void hom_change_name_ack(map_session_data *sd, char* name, int flag);
 #define hom_stop_walking(hd, type) unit_stop_walking(&(hd)->bl, type)
 #define hom_stop_attack(hd) unit_stop_attack(&(hd)->bl)
 int hom_increase_intimacy(struct homun_data * hd, unsigned int value);

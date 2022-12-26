@@ -29,7 +29,7 @@ int chmapif_sendall(unsigned char *buf, unsigned int len){
 	c = 0;
 	for(i = 0; i < ARRAYLENGTH(map_server); i++) {
 		int fd;
-		if ((fd = map_server[i].fd) > 0) {
+		if (session_isValid(fd = map_server[i].fd)) {
 			WFIFOHEAD(fd,len);
 			memcpy(WFIFOP(fd,0), buf, len);
 			WFIFOSET(fd,len);
@@ -53,7 +53,7 @@ int chmapif_sendallwos(int sfd, unsigned char *buf, unsigned int len){
 	c = 0;
 	for(i = 0; i < ARRAYLENGTH(map_server); i++) {
 		int fd;
-		if ((fd = map_server[i].fd) > 0 && fd != sfd) {
+		if (session_isValid(fd = map_server[i].fd) && fd != sfd) {
 			WFIFOHEAD(fd,len);
 			memcpy(WFIFOP(fd,0), buf, len);
 			WFIFOSET(fd,len);
@@ -72,7 +72,7 @@ int chmapif_sendallwos(int sfd, unsigned char *buf, unsigned int len){
  * @return : the number of map-serv the packet was sent to (O|1)
  */
 int chmapif_send(int fd, unsigned char *buf, unsigned int len){
-	if (fd >= 0) {
+	if (session_isValid(fd)) {
 		int i;
 		ARR_FIND( 0, ARRAYLENGTH(map_server), i, fd == map_server[i].fd );
 		if( i < ARRAYLENGTH(map_server) )
@@ -122,7 +122,7 @@ int chmapif_send_fame_list(int fd){
 	// add total packet length
 	WBUFW(buf, 2) = len;
 
-	if (fd != -1)
+	if (session_isValid(fd))
 		chmapif_send(fd, buf, len);
 	else
 		chmapif_sendall(buf, len);
@@ -162,24 +162,26 @@ void chmapif_sendall_playercount(int users){
  * Send some misc info to new map-server.
  * - Server name for whisper name
  * - Default map
- * HZ 0x2afb <size>.W <status>.B <name>.24B <mapname>.11B <map_x>.W <map_y>.W
+ * HZ 0x2afb <size>.W <status>.B <whisper name>.24B <mapname>.11B <map_x>.W <map_y>.W <server name>.24B
  * @param fd
  **/
 void chmapif_send_misc(int fd) {
 	uint16 offs = 5;
-	unsigned char buf[45];
+	unsigned char buf[45+NAME_LENGTH];
 
 	memset(buf, '\0', sizeof(buf));
 	WBUFW(buf, 0) = 0x2afb;
 	// 0 succes, 1:failure
 	WBUFB(buf, 4) = 0;
 	// Send name for wisp to player
-	memcpy(WBUFP(buf, 5), charserv_config.wisp_server_name, NAME_LENGTH);
+	safestrncpy( WBUFCP( buf, 5 ), charserv_config.wisp_server_name, NAME_LENGTH );
 	// Default map
-	memcpy(WBUFP(buf, (offs+=NAME_LENGTH)), charserv_config.default_map, MAP_NAME_LENGTH); // 29
+	safestrncpy( WBUFCP( buf, ( offs += NAME_LENGTH ) ), charserv_config.default_map, MAP_NAME_LENGTH ); // 29
 	WBUFW(buf, (offs+=MAP_NAME_LENGTH)) = charserv_config.default_map_x; // 41
 	WBUFW(buf, (offs+=2)) = charserv_config.default_map_y; // 43
 	offs+=2;
+	safestrncpy( WBUFCP( buf, offs ), charserv_config.server_name, sizeof( charserv_config.server_name ) ); // 45
+	offs += NAME_LENGTH;
 
 	// Length
 	WBUFW(buf, 2) = offs;
@@ -212,15 +214,13 @@ void chmapif_send_maps(int fd, int map_id, int count, unsigned char *mapbuf) {
 
 	// Transmitting the maps of the other map-servers to the new map-server
 	for (x = 0; x < ARRAYLENGTH(map_server); x++) {
-		if (map_server[x].fd > 0 && x != map_id) {
-			uint16 i, j;
-
+		if (session_isValid(map_server[x].fd) && x != map_id) {
 			WFIFOHEAD(fd,10 +4*map_server[x].map.size());
 			WFIFOW(fd,0) = 0x2b04;
 			WFIFOL(fd,4) = htonl(map_server[x].ip);
 			WFIFOW(fd,8) = htons(map_server[x].port);
-			j = 0;
-			for(i = 0; i < map_server[x].map.size(); i++)
+			uint16 j = 0;
+			for(size_t i = 0; i < map_server[x].map.size(); i++)
 				if (map_server[x].map[i])
 					WFIFOW(fd,10+(j++)*4) = map_server[x].map[i];
 			if (j > 0) {
@@ -458,7 +458,7 @@ int chmapif_parse_authok(int fd){
 		uint32 ip = RFIFOL(fd,14);
 		RFIFOSKIP(fd,18);
 
-		if( runflag != CHARSERVER_ST_RUNNING ){
+		if( !global_core->is_running() ){
 			chmapif_charselres(fd,account_id,0);
 		}else{
 			struct auth_node* node;
@@ -610,7 +610,7 @@ int chmapif_parse_reqchangemapserv(int fd){
 			char_data = (struct mmo_charstatus*)uidb_get(char_db_,RFIFOL(fd,14));
 		}
 
-		if( runflag == CHARSERVER_ST_RUNNING &&
+		if( global_core->is_running() &&
 			session_isActive(map_fd) &&
 			char_data )
 		{	//Send the map server the auth of this player.
@@ -1011,7 +1011,7 @@ int chmapif_parse_reqauth(int fd, int id){
 				char_mmo_char_fromsql(char_id, &char_dat, true);
 				cd = (struct mmo_charstatus*)uidb_get(char_db_,char_id);
 		}
-		if( runflag == CHARSERVER_ST_RUNNING && autotrade && cd ){
+		if( global_core->is_running() && autotrade && cd ){
 			uint16 mmo_charstatus_len = sizeof(struct mmo_charstatus) + 25;
 
 			WFIFOHEAD(fd,mmo_charstatus_len);
@@ -1027,7 +1027,7 @@ int chmapif_parse_reqauth(int fd, int id){
 			WFIFOSET(fd, WFIFOW(fd,2));
 
 			char_set_char_online(id, char_id, account_id);
-		} else if( runflag == CHARSERVER_ST_RUNNING &&
+		} else if( global_core->is_running() &&
 			cd != NULL &&
 			node != NULL &&
 			node->account_id == account_id &&
@@ -1498,7 +1498,7 @@ void chmapif_server_reset(int id){
 	WBUFW(buf,0) = 0x2b20;
 	WBUFL(buf,4) = htonl(map_server[id].ip);
 	WBUFW(buf,8) = htons(map_server[id].port);
-	for(uint16 i = 0; i < map_server[id].map.size(); i++)
+	for(size_t i = 0; i < map_server[id].map.size(); i++)
 		if (map_server[id].map[i])
 			WBUFW(buf,10+(j++)*4) = map_server[id].map[i];
 	if (j > 0) {

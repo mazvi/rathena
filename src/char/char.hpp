@@ -12,18 +12,32 @@
 #include "../common/timer.hpp"
 #include "../config/core.hpp"
 
+#include "packets.hpp"
+
+using rathena::server_core::Core;
+using rathena::server_core::e_core_type;
+
+namespace rathena{
+	namespace server_character{
+		class CharacterServer : public Core{
+			protected:
+				bool initialize( int argc, char* argv[] ) override;
+				void finalize() override;
+				void handle_shutdown() override;
+
+			public:
+				CharacterServer() : Core( e_core_type::CHARACTER ){
+
+				}
+		};
+	}
+}
+
 extern int login_fd; //login file descriptor
 extern int char_fd; //char file descriptor
 
 #define MAX_STARTPOINT 5
 #define MAX_STARTITEM 32
-
-enum E_CHARSERVER_ST {
-	CHARSERVER_ST_RUNNING = CORE_ST_LAST,
-	CHARSERVER_ST_STARTING,
-	CHARSERVER_ST_SHUTDOWN,
-	CHARSERVER_ST_LAST
-};
 
 enum e_char_delete {
 	CHAR_DEL_EMAIL = 1,
@@ -173,6 +187,7 @@ struct CharServ_Config {
 	struct point start_point[MAX_STARTPOINT], start_point_doram[MAX_STARTPOINT]; // Initial position the player will spawn on the server
 	short start_point_count, start_point_count_doram; // Number of positions read
 	struct startitem start_items[MAX_STARTITEM], start_items_doram[MAX_STARTITEM]; // Initial items the player with spawn with on the server
+	uint32 start_status_points;
 	int console;
 	int max_connect_user;
 	int gm_allow_group;
@@ -187,6 +202,8 @@ struct CharServ_Config {
 	int clan_remove_inactive_days;
 	int mail_return_days;
 	int mail_delete_days;
+	int mail_retrieve;
+	int mail_return_empty;
 
 	int allowed_job_flag;
 };
@@ -267,7 +284,7 @@ extern struct fame_list chemist_fame_list[MAX_FAME_LIST];
 extern struct fame_list taekwon_fame_list[MAX_FAME_LIST];
 
 #define DEFAULT_AUTOSAVE_INTERVAL 300*1000
-#define MAX_CHAR_BUF 150 //Max size (for WFIFOHEAD calls)
+#define MAX_CHAR_BUF sizeof( struct CHARACTER_INFO ) //Max size (for WFIFOHEAD calls)
 
 int char_search_mapserver(unsigned short map, uint32 ip, uint16 port);
 int char_lan_subnetcheck(uint32 ip);
